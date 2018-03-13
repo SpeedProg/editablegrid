@@ -1,5 +1,5 @@
 if (typeof _$ == 'undefined') {
-	function _$(elementId) { return document.getElementById(elementId); }
+	var _$ = function(elementId) { return document.getElementById(elementId); }
 }
 
 /**
