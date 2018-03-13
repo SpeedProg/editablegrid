@@ -34,95 +34,92 @@ EditableGrid.prototype.checkChartLib_OFC = function()
  */
 EditableGrid.prototype.renderBarChart_OFC = function(divId, title, labelColumnIndexOrName, options)
 {
-	with (this) {
+  if (EditableGrid_check_lib && !checkChartLib_OFC()) return false;
 
-		if (EditableGrid_check_lib && !checkChartLib_OFC()) return false;
+  // default options
+  this.legend = null;
+  this.bgColor = "#ffffff";
+  this.alpha = 0.9;
+  this.limit = 0;
+  this.bar3d = true;
+  this.rotateXLabels = 0;
 
-		// default options
-		this.legend = null;
-		this.bgColor = "#ffffff";
-		this.alpha = 0.9;
-		this.limit = 0;
-		this.bar3d = true;
-		this.rotateXLabels = 0;
+  // override default options with the ones given
+  if (options) for (var p in options) this[p] = options[p];
 
-		// override default options with the ones given
-		if (options) for (var p in options) this[p] = options[p];
+  labelColumnIndexOrName = labelColumnIndexOrName || 0;
+  var cLabel = getColumnIndex(labelColumnIndexOrName);
 
-		labelColumnIndexOrName = labelColumnIndexOrName || 0;
-		var cLabel = getColumnIndex(labelColumnIndexOrName);
+  var chart = new ofc_chart();
+  chart.bg_colour = this.bgColor;
+  chart.set_title({text: title || '', style: "{font-size: 20px; color:#0000ff; font-family: Verdana; text-align: center;}"});
 
-		var chart = new ofc_chart();
-		chart.bg_colour = bgColor;
-		chart.set_title({text: title || '', style: "{font-size: 20px; color:#0000ff; font-family: Verdana; text-align: center;}"});
+  var columnCount = this.getColumnCount();
+  var rowCount = this.getRowCount() - (this.ignoreLastRow ? 1 : 0);
+  if (this.limit > 0 && rowCount > this.limit) rowCount = this.limit;
 
-		var columnCount = getColumnCount();
-		var rowCount = getRowCount() - (ignoreLastRow ? 1 : 0);
-		if (limit > 0 && rowCount > limit) rowCount = limit;
+  var maxvalue = 0;
+  for (var c = 0; c < columnCount; c++) {
+    if (!this.isColumnBar(c)) continue;
+    var bar = new ofc_element(bar3d ? "bar_3d" : "bar");
+    bar.alpha = this.alpha;
+    bar.colour = this.smartColorsBar[chart.elements.length % this.smartColorsBar.length];
+    bar.fill = "transparent";
+    bar.text = this.getColumnLabel(c);
+    for (var r = 0; r < rowCount; r++) {
+      if (this.getRowAttribute(r, "skip") == "1") continue;
+      var value = this.getValueAt(r,c);
+      if (value > maxvalue) maxvalue = value;
+      bar.values.push(value);
+    }
+    chart.add_element(bar);
+  }
 
-		var maxvalue = 0;
-		for (var c = 0; c < columnCount; c++) {
-			if (!isColumnBar(c)) continue;
-			var bar = new ofc_element(bar3d ? "bar_3d" : "bar");
-			bar.alpha = alpha;
-			bar.colour = smartColorsBar[chart.elements.length % smartColorsBar.length];
-			bar.fill = "transparent";
-			bar.text = getColumnLabel(c);
-			for (var r = 0; r < rowCount; r++) {
-				if (getRowAttribute(r, "skip") == "1") continue;
-				var value = getValueAt(r,c);
-				if (value > maxvalue) maxvalue = value; 
-				bar.values.push(value);
-			}
-			chart.add_element(bar);
-		}
+  // round the y max value
+  var ymax = 10;
+  while (ymax < maxvalue) ymax *= 10;
+  var dec_step = ymax / 10;
+  while (ymax - dec_step > maxvalue) ymax -= dec_step;
 
-		// round the y max value
-		var ymax = 10;
-		while (ymax < maxvalue) ymax *= 10;
-		var dec_step = ymax / 10;
-		while (ymax - dec_step > maxvalue) ymax -= dec_step;
+  var xLabels = [];
+  for (var r = 0; r < rowCount; r++) {
+    if (this.getRowAttribute(r, "skip") == "1") continue;
+    var label = this.getRowAttribute(r, "barlabel"); // if there is a barlabel attribute, use it and ignore labelColumn
+    xLabels.push(label ? label : this.getValueAt(r,cLabel));
+  }
 
-		var xLabels = [];
-		for (var r = 0; r < rowCount; r++) {
-			if (getRowAttribute(r, "skip") == "1") continue;
-			var label = getRowAttribute(r, "barlabel"); // if there is a barlabel attribute, use it and ignore labelColumn
-			xLabels.push(label ? label : getValueAt(r,cLabel));
-		}
+  chart.x_axis = {
+      stroke: 1,
+      tick_height:  10,
+      colour: "#E2E2E2",
+      "grid-colour": "#E2E2E2",
+      labels: { rotate: this.rotateXLabels, labels: xLabels },
+      "3d": 5
+  };
 
-		chart.x_axis = {
-				stroke: 1,
-				tick_height:  10,
-				colour: "#E2E2E2",
-				"grid-colour": "#E2E2E2",
-				labels: { rotate: rotateXLabels, labels: xLabels },
-				"3d": 5
-		};
+  chart.y_axis = {
+      stroke: 4,
+      tick_length: 3,
+      colour: "#428BC7",
+      "grid-colour": "#E2E2E2",
+      offset: 0,
+      steps: ymax / 10.0,
+      max: ymax
+  };
 
-		chart.y_axis = {
-				stroke: 4,
-				tick_length: 3,
-				colour: "#428BC7",
-				"grid-colour": "#E2E2E2",
-				offset: 0,
-				steps: ymax / 10.0,
-				max: ymax
-		};
+  // chart.num_decimals = 0;
 
-		// chart.num_decimals = 0;
+  chart.x_legend = {
+      text: legend || this.getColumnLabel(labelColumnIndexOrName),
+      style: "{font-size: 11px; color: #000033}"
+  };
 
-		chart.x_legend = {
-				text: legend || getColumnLabel(labelColumnIndexOrName),
-				style: "{font-size: 11px; color: #000033}"
-		};
+  chart.y_legend = {
+      text: "",
+      style: "{font-size: 11px; color: #000033}"
+  };
 
-		chart.y_legend = {
-				text: "",
-				style: "{font-size: 11px; color: #000033}"
-		};
-
-		updateChart(divId, chart);
-	}
+  this.updateChart(divId, chart);
 };
 
 /**
@@ -136,105 +133,104 @@ EditableGrid.prototype.renderBarChart_OFC = function(divId, title, labelColumnIn
  */
 EditableGrid.prototype.renderStackedBarChart_OFC = function(divId, title, labelColumnIndexOrName, options)
 {
-	with (this) {
 
-		if (EditableGrid_check_lib && !checkChartLib_OFC()) return false;
+  if (EditableGrid_check_lib && !checkChartLib_OFC()) return false;
 
-		// default options
-		this.legend = null;
-		this.bgColor = "#ffffff";
-		this.alpha = 0.8;
-		this.limit = 0;
-		this.rotateXLabels = 0;
+  // default options
+  this.legend = null;
+  this.bgColor = "#ffffff";
+  this.alpha = 0.8;
+  this.limit = 0;
+  this.rotateXLabels = 0;
 
-		// override default options with the ones given
-		if (options) for (var p in options) this[p] = options[p];
+  // override default options with the ones given
+  if (options) for (var p in options) this[p] = options[p];
 
-		labelColumnIndexOrName = labelColumnIndexOrName || 0;
-		var cLabel = getColumnIndex(labelColumnIndexOrName);
+  labelColumnIndexOrName = labelColumnIndexOrName || 0;
+  var cLabel = this.getColumnIndex(labelColumnIndexOrName);
 
-		var chart = new ofc_chart();
-		chart.bg_colour = bgColor;
-		chart.set_title({text: title || '', style: "{font-size: 20px; color:#0000ff; font-family: Verdana; text-align: center;}"});
+  var chart = new ofc_chart();
+  chart.bg_colour = this.bgColor;
+  chart.set_title({text: title || '', style: "{font-size: 20px; color:#0000ff; font-family: Verdana; text-align: center;}"});
 
-		var columnCount = getColumnCount();
-		var rowCount = getRowCount() - (ignoreLastRow ? 1 : 0);
-		if (limit > 0 && rowCount > limit) rowCount = limit;
+  var columnCount = this.getColumnCount();
+  var rowCount = this.getRowCount() - (this.ignoreLastRow ? 1 : 0);
+  if (this.limit > 0 && rowCount > this.limit) rowCount = this.limit;
 
-		var maxvalue = 0;
-		var bar = new ofc_element("bar_stack");
-		bar.alpha = alpha;
-		bar.colours = smartColorsBar;
-		bar.fill = "transparent";
-		bar.keys = [];
+  var maxvalue = 0;
+  var bar = new ofc_element("bar_stack");
+  bar.alpha = this.alpha;
+  bar.colours = this.smartColorsBar;
+  bar.fill = "transparent";
+  bar.keys = [];
 
-		for (var c = 0; c < columnCount; c++) {
-			if (!isColumnBar(c)) continue;
-			bar.keys.push({ colour: smartColorsBar[bar.keys.length % smartColorsBar.length], text: getColumnLabel(c), "font-size": '13' });
-		}
+  for (var c = 0; c < columnCount; c++) {
+    if (!isColumnBar(c)) continue;
+    bar.keys.push({ colour: smartColorsBar[bar.keys.length % this.smartColorsBar.length],
+     text: this.getColumnLabel(c), "font-size": '13' });
+  }
 
-		for (var r = 0; r < rowCount; r++) {
-			if (getRowAttribute(r, "skip") == "1") continue;
-			var valueRow = [];
-			var valueStack = 0;
-			for (var c = 0; c < columnCount; c++) {
-				if (!isColumnBar(c)) continue;
-				var value = getValueAt(r,c);
-				value = isNaN(value) ? 0 : value;
-				valueStack += value;
-				valueRow.push(value);
-			}
-			if (valueStack > maxvalue) maxvalue = valueStack; 
-			bar.values.push(valueRow);
-		}
+  for (var r = 0; r < rowCount; r++) {
+    if (this.getRowAttribute(r, "skip") == "1") continue;
+    var valueRow = [];
+    var valueStack = 0;
+    for (var c = 0; c < columnCount; c++) {
+      if (!this.isColumnBar(c)) continue;
+      var value = this.getValueAt(r,c);
+      value = isNaN(value) ? 0 : value;
+      valueStack += value;
+      valueRow.push(value);
+    }
+    if (valueStack > maxvalue) maxvalue = valueStack;
+    bar.values.push(valueRow);
+  }
 
-		chart.add_element(bar);
+  chart.add_element(bar);
 
-		// round the y max value
-		var ymax = 10;
-		while (ymax < maxvalue) ymax *= 10;
-		var dec_step = ymax / 10;
-		while (ymax - dec_step > maxvalue) ymax -= dec_step;
+  // round the y max value
+  var ymax = 10;
+  while (ymax < maxvalue) ymax *= 10;
+  var dec_step = ymax / 10;
+  while (ymax - dec_step > maxvalue) ymax -= dec_step;
 
-		var xLabels = [];
-		for (var r = 0; r < rowCount; r++) {
-			if (getRowAttribute(r, "skip") == "1") continue;
-			xLabels.push("aa " + getValueAt(r,cLabel));
-		}
+  var xLabels = [];
+  for (var r = 0; r < rowCount; r++) {
+    if (this.getRowAttribute(r, "skip") == "1") continue;
+    xLabels.push("aa " + this.getValueAt(r,cLabel));
+  }
 
-		chart.x_axis = {
-				stroke: 1,
-				tick_height:  10,
-				colour: "#E2E2E2",
-				"grid-colour": "#E2E2E2",
-				labels: { rotate: rotateXLabels, labels: xLabels },
-				"3d": 5
-		};
+  chart.x_axis = {
+      stroke: 1,
+      tick_height:  10,
+      colour: "#E2E2E2",
+      "grid-colour": "#E2E2E2",
+      labels: { rotate: this.rotateXLabels, labels: xLabels },
+      "3d": 5
+  };
 
-		chart.y_axis = {
-				stroke: 4,
-				tick_length: 3,
-				colour: "#428BC7",
-				"grid-colour": "#E2E2E2",
-				offset: 0,
-				steps: ymax / 10.0,
-				max: ymax
-		};
+  chart.y_axis = {
+      stroke: 4,
+      tick_length: 3,
+      colour: "#428BC7",
+      "grid-colour": "#E2E2E2",
+      offset: 0,
+      steps: ymax / 10.0,
+      max: ymax
+  };
 
-		// chart.num_decimals = 0;
+  // chart.num_decimals = 0;
 
-		chart.x_legend = {
-				text: legend || getColumnLabel(labelColumnIndexOrName),
-				style: "{font-size: 11px; color: #000033}"
-		};
+  chart.x_legend = {
+      text: legend || this.getColumnLabel(labelColumnIndexOrName),
+      style: "{font-size: 11px; color: #000033}"
+  };
 
-		chart.y_legend = {
-				text: "",
-				style: "{font-size: 11px; color: #000033}"
-		};
+  chart.y_legend = {
+      text: "",
+      style: "{font-size: 11px; color: #000033}"
+  };
 
-		updateChart(divId, chart);
-	}
+  this.updateChart(divId, chart);
 };
 
 /**
@@ -248,81 +244,79 @@ EditableGrid.prototype.renderStackedBarChart_OFC = function(divId, title, labelC
  */
 EditableGrid.prototype.renderPieChart_OFC = function(divId, title, valueColumnIndexOrName, labelColumnIndexOrName, options) 
 {
-	with (this) {
 
-		if (EditableGrid_check_lib && !checkChartLib_OFC()) return false;
+  if (EditableGrid_check_lib && !checkChartLib_OFC()) return false;
 
-		// default options
-		this.startAngle = 0;
-		this.bgColor = "#ffffff";
-		this.alpha = 0.5;
-		this.limit = 0;
-		this.gradientFill = true;
+  // default options
+  this.startAngle = 0;
+  this.bgColor = "#ffffff";
+  this.alpha = 0.5;
+  this.limit = 0;
+  this.gradientFill = true;
 
-		// override default options with the ones given
-		if (options) for (var p in options) this[p] = options[p];
+  // override default options with the ones given
+  if (options) for (var p in options) this[p] = options[p];
 
-		var type = getColumnType(valueColumnIndexOrName);
-		if (type != "double" && type != "integer" && valueColumnIndexOrName != labelColumnIndexOrName) return;
+  var type = this.getColumnType(valueColumnIndexOrName);
+  if (type != "double" && type != "integer" && valueColumnIndexOrName != labelColumnIndexOrName) return;
 
-		labelColumnIndexOrName = labelColumnIndexOrName || 0;
-		title = (typeof title == 'undefined' || title === null) ? getColumnLabel(valueColumnIndexOrName) : title;
+  labelColumnIndexOrName = labelColumnIndexOrName || 0;
+  title = (typeof title == 'undefined' || title === null) ? this.getColumnLabel(valueColumnIndexOrName) : title;
 
-		var cValue = getColumnIndex(valueColumnIndexOrName);
-		var cLabel = getColumnIndex(labelColumnIndexOrName);
+  var cValue = this.getColumnIndex(valueColumnIndexOrName);
+  var cLabel = this.getColumnIndex(labelColumnIndexOrName);
 
-		var chart = new ofc_chart();
-		chart.bg_colour = bgColor;
-		chart.set_title({text: title, style: "{font-size: 20px; color:#0000ff; font-family: Verdana; text-align: center;}"});
+  var chart = new ofc_chart();
+  chart.bg_colour = this.bgColor;
+  chart.set_title({text: title, style: "{font-size: 20px; color:#0000ff; font-family: Verdana; text-align: center;}"});
 
-		var rowCount = getRowCount() - (ignoreLastRow ? 1 : 0);
-		if (limit > 0 && rowCount > limit) rowCount = limit;
+  var rowCount = this.getRowCount() - (this.ignoreLastRow ? 1 : 0);
+  if (this.limit > 0 && rowCount > this.limit) rowCount = this.limit;
 
-		var pie = new ofc_element("pie");
-		pie.colours = smartColorsPie;
-		pie.alpha = alpha;
-		pie['gradient-fill'] = gradientFill;
+  var pie = new ofc_element("pie");
+  pie.colours = this.smartColorsPie;
+  pie.alpha = this.alpha;
+  pie['gradient-fill'] = this.gradientFill;
 
-		if (typeof startAngle != 'undefined' && startAngle !== null) pie['start-angle'] = startAngle;
+  if (typeof this.startAngle != 'undefined' && this.startAngle !== null) pie['start-angle'] = this.startAngle;
 
-		if (valueColumnIndexOrName == labelColumnIndexOrName) {
+  if (valueColumnIndexOrName == labelColumnIndexOrName) {
 
-			// frequency pie chart
-			var distinctValues = {}; 
-			for (var r = 0; r < rowCount; r++) {
-				if (getRowAttribute(r, "skip") == "1") continue;
-				var rowValue = getValueAt(r,cValue);
-				if (rowValue in distinctValues) distinctValues[rowValue]++;
-				else distinctValues[rowValue] = 1;
-			}
+    // frequency pie chart
+    var distinctValues = {};
+    for (var r = 0; r < rowCount; r++) {
+      if (this.getRowAttribute(r, "skip") == "1") continue;
+      var rowValue = this.getValueAt(r,cValue);
+      if (rowValue in distinctValues) distinctValues[rowValue]++;
+      else distinctValues[rowValue] = 1;
+    }
 
-			for (var value in distinctValues) {
-				var occurences = distinctValues[value];
-				pie.values.push({value : occurences, label: value + ' (' + (100 * (occurences / rowCount)).toFixed(1) + '%)'});
-			}
-		}
-		else {
+    for (var value in distinctValues) {
+      var occurences = distinctValues[value];
+      pie.values.push({value : occurences, label: value + ' (' + (100 * (occurences / rowCount)).toFixed(1) + '%)'});
+    }
+  }
+  else {
 
-			var total = 0; 
-			for (var r = 0; r < rowCount; r++) {
-				if (getRowAttribute(r, "skip") == "1") continue;
-				var rowValue = getValueAt(r,cValue);
-				total += isNaN(rowValue) ? 0 : rowValue;
-			}
+    var total = 0;
+    for (var r = 0; r < rowCount; r++) {
+      if (this.getRowAttribute(r, "skip") == "1") continue;
+      var rowValue = this.getValueAt(r,cValue);
+      total += isNaN(rowValue) ? 0 : rowValue;
+    }
 
-			for (var r = 0; r < rowCount; r++) {
-				if (getRowAttribute(r, "skip") == "1") continue;
-				var value = getValueAt(r,cValue);
-				var label = getValueAt(r,cLabel);
-				if (!isNaN(value)) pie.values.push({value : value, label: label + ' (' + (100 * (value / total)).toFixed(1) + '%)'});
-			}
-		}
+    for (var r = 0; r < rowCount; r++) {
+      if (this.getRowAttribute(r, "skip") == "1") continue;
+      var value = this.getValueAt(r,cValue);
+      var label = this.getValueAt(r,cLabel);
+      if (!isNaN(value)) pie.values.push({value : value, label: label + ' (' + (100 * (value / total)).toFixed(1) + '%)'});
+    }
+  }
 
-		chart.add_element(pie);
+  chart.add_element(pie);
 
-		if (pie.values.length > 0) updateChart(divId, chart);
-		return pie.values.length;
-	}
+  if (pie.values.length > 0) this.updateChart(divId, chart);
+  return pie.values.length;
 };
 
 /**
@@ -346,8 +340,6 @@ EditableGrid.prototype.updateChart = function(divId, chart)
 			}
 		};
 	}
-
-	with (this) {
 
 		// reload or create new swf chart
 		var swf = findSWF(divId);
@@ -374,6 +366,5 @@ EditableGrid.prototype.updateChart = function(divId, chart)
 			);
 		}
 
-		chartRendered();
-	}
+		this.chartRendered();
 };
